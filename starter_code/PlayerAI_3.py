@@ -130,31 +130,32 @@ class State:
         mean_weight = 5.0
         corner_weight = 10
 
-        return (math.log(self.empty_cells()) if self.empty_cells() != 0 else 0) * empty_weight +\
-            self.monotonicity() * mono_weight + self.max_value() * max_weight + \
-            self.smoothness() * smooth_weight + self.max_value_at_corner() * corner_weight + self.mean_value() * mean_weight
-
-    def mean_value(self):
         m = np.array(self.grid.map)
+
+        return (math.log(self.empty_cells(m)) if self.empty_cells(m) != 0 else 0) * empty_weight +\
+            self.monotonicity(m) * mono_weight + self.max_value(m) * max_weight + \
+            self.smoothness(m) * smooth_weight + self.max_value_at_corner(m) * corner_weight + self.mean_value(m) * mean_weight
+
+    def mean_value(self, m):
         m = m[m != 0]
         return math.log(m.mean(), 2)
 
-    def max_value_at_corner(self):
-        m = np.array(self.grid.map)
+    # punish when the max value is not at the corner
+    def max_value_at_corner(self, m):
         index = m.argmax()
         if index in [0, 3, 12, 15]:
             return 1
         else:
             return 0
 
-    def empty_cells(self):
-        return (np.array(self.grid.map) == 0).sum()
+    def empty_cells(self, m):
+        return (m == 0).sum()
 
-    def max_value(self):
-        m = np.max(np.array(self.grid.map))
-        return math.log(m, 2)
+    def max_value(self, m):
+        return math.log(np.max(m), 2)
 
-    def monotonicity(self):
+    # The value measures the tiles are strictly increasing or decreasing in both left/right and up/down directions
+    def monotonicity(self, m):
         # scores for all directions
         scores = [0, 0, 0, 0]
         # up/down direction
@@ -162,12 +163,12 @@ class State:
             current = 0
             next = current + 1
             while next < self.grid.size:
-                while next < self.grid.size and self.grid.map[i][next] == 0:
+                while next < self.grid.size and m[i, next] == 0:
                     next += 1
                 if next >= 4:
                     next -= 1
-                current_value = math.log(self.grid.map[i][current], 2) if self.grid.map[i][current] != 0 else 0
-                next_value = math.log(self.grid.map[i][next], 2) if self.grid.map[i][next] != 0 else 0
+                current_value = math.log(m[i, current], 2) if m[i, current] != 0 else 0
+                next_value = math.log(m[i, next], 2) if m[i, next] != 0 else 0
                 if current_value > next_value:
                     scores[0] += next_value - current_value
                 elif next_value > current_value:
@@ -180,12 +181,12 @@ class State:
             current = 0
             next = current + 1
             while next < self.grid.size:
-                while next < self.grid.size and self.grid.map[next][j] == 0:
+                while next < self.grid.size and m[next, j] == 0:
                     next += 1
                 if next >= 4:
                     next -= 1
-                current_value = math.log(self.grid.map[current][j], 2) if self.grid.map[current][j] != 0 else 0
-                next_value = math.log(self.grid.map[next][j], 2) if self.grid.map[next][j] != 0 else 0
+                current_value = math.log(m[current, j], 2) if m[current, j] != 0 else 0
+                next_value = math.log(m[next, j], 2) if m[next, j] != 0 else 0
                 if current_value > next_value:
                     scores[2] += next_value - current_value
                 elif next_value > current_value:
@@ -194,33 +195,34 @@ class State:
                 next += 1
         return max((scores[0], scores[1])) + max((scores[2], scores[3]))
 
-    def smoothness(self):
+    # Measures how smooth the grid is. Sum of differences of all pairs.
+    def smoothness(self, m):
         smooth = 0
         for i in range(self.grid.size):
             for j in range(self.grid.size):
-                if self.grid.map[i][j] != 0:
-                    value = math.log(self.grid.map[i][j], 2)
+                if m[i, j] != 0:
+                    value = math.log(m[i, j], 2)
 
-                    next_right = self.find_next(i, j, True)
+                    next_right = self.find_next(m, i, j, True)
                     if next_right:
                         smooth -= math.fabs(math.log(next_right, 2) - value)
-                    next_down = self.find_next(i, j, False)
+                    next_down = self.find_next(m, i, j, False)
                     if next_down:
                         smooth -= math.fabs(math.log(next_down, 2) - value)
         return smooth
 
-
-    def find_next(self, i, j, right=True):
+    # find the next value of (i, j) in right/down direction. Return None if not exited
+    def find_next(self, m, i, j, right=True):
         if right:
             j = j + 1
-            while j < self.grid.size and self.grid.map[i][j] == 0:
+            while j < self.grid.size and m[i, j] == 0:
                 j += 1
-            return self.grid.map[i][j] if j < self.grid.size else None
+            return m[i, j] if j < self.grid.size else None
         else:
             i = i + 1
-            while i < self.grid.size and self.grid.map[i][j] == 0:
+            while i < self.grid.size and m[i, j] == 0:
                 i += 1
-            return self.grid.map[i][j] if i < self.grid.size else None
+            return m[i, j] if i < self.grid.size else None
 
 if __name__ == '__main__':
     g = Grid()
