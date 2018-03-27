@@ -11,4 +11,4 @@ python3 GameManager_3.py
 ```
 
 # Sample output
-[result](result.png)
+![result](result.png)
